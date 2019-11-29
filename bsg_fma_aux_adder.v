@@ -18,20 +18,32 @@ module bsg_fma_aux_adder(
     ,output [7:0] mod_o
 );
 
-wire [7:0][7:0] top_mod_bit;
-wire [7:0][7:0] bottom_mod_bit;
+wire [15:0][7:0] mod_bit;
 
 for(genvar i = 0; i < 8; ++i) begin: TOP_BIT;
-    assign top_mod_bit[i] = ({8{b_l_i[i]}} & a_h_i) << i;
+    assign mod_bit[i] = ({8{b_l_i[i]}} & a_h_i) << i;
 end: TOP_BIT
 
 for(genvar i = 0; i < 8; ++i) begin: BOTTOM_BIT
-    assign bottom_mod_bit[i] = ({8{b_h_i[i]}} & a_l_i)  << i;
+    assign mod_bit[i+8] = ({8{b_h_i[i]}} & a_l_i)  << i;
 end: BOTTOM_BIT
 
 // Perform Accumulation
 
+wire [7:0] csa_A;
+wire [7:0] csa_B;
 
+bsg_adder_wallace_tree #(
+    .width_p(8)
+    ,.iter_step_p(16)
+    ,.max_out_size_lp(8)
+) wallace_tree (
+    .op_i(mod_bit)
+    ,.resA_o(csa_A)
+    ,.resB_o(csa_B)
+);
+
+assign mod_o = csa_A + csa_B;
 
 
 
