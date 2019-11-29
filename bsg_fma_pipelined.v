@@ -29,5 +29,10 @@ module bsg_fma_pipelined #(
   ,output v_o
 );
 
+// calculate the 24 bit multiplication.
+wire [47:0] mul_24res = opA_i[23:0] * opB_i[23:0];
+
+
+
 
 endmodule
