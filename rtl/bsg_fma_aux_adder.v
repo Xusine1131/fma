@@ -7,7 +7,7 @@
 // -------------------------------------------------------
 
 module bsg_fma_aux_adder(
-    ,input [7:0] a_l_i
+    input [7:0] a_l_i
     ,input [7:0] a_h_i
     //,input a_signed_i
     
