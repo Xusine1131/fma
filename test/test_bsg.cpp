@@ -1,5 +1,5 @@
 #include "verilated.h"
-#include "obj_dir/Vfma_test.h"
+#include "obj_dir/Vbsg_fma.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -7,7 +7,7 @@
 int main(int argc, char **argv){
     Verilated::commandArgs(argc, argv);
 
-    Vfma_test *dut = new Vfma_test{};
+    Vbsg_fma *dut = new Vbsg_fma{};
 
     srand(time(nullptr));
 
