@@ -368,7 +368,9 @@ module
     mulAddRecFNToRaw#(parameter expWidth = 3, parameter sigWidth = 3) (
         input [(`floatControlWidth - 1):0] control,
         input [1:0] op,
+        // by set int_mul to 1, we can reuse this module to execute RISC-V integer multiply instruction MUL.
         input int_mul,
+        // Note that for both signed and unsigned multiply, the results are the same, because we truncated the sign extension when only evaluating lower part. 
         input [(expWidth + sigWidth):0] a,
         input [(expWidth + sigWidth):0] b,
         input [(expWidth + sigWidth):0] c,
@@ -380,7 +382,8 @@ module
         output out_sign,
         output signed [(expWidth + 1):0] out_sExp,
         output [(sigWidth + 2):0] out_sig,
-        output int_mul_res
+        // The output port of integer multiply.
+        output [expWidth + sigWidth-1:0] int_mul_res
     );
 `include "HardFloat_localFuncs.vi"
 
@@ -406,12 +409,16 @@ module
             intermed_CDom_CAlignDist,
             intermed_highAlignedSigC
         );
-    // This part has been modified so that we can support integer multiplication.
+    // This part has been modified so that we can support RISC-V integer multiply instruction MUL.
+    // Please refer to the document for detailed implementation.
+    // Select operands of 24bit multiply.
     wire [sigWidth-1:0] mulA = int_mul ? a[sigWidth-1:0] : mulAddA;
     wire [sigWidth-1:0] mulB = int_mul ? b[sigWidth-1:0] : mulAddB;
+    // Generate modification bits
     wire [expWidth-1:0] aux_part = a[expWidth-1:0] * b[sigWidth+:expWidth] + a[sigWidth+:expWidth] * b[expWidth-1:0];
-    wire [sigWidth*2-1:0] muladd = int_mul ? {aux_part, sigWidth'(0)} : mulAddC;
-    wire [sigWidth*2:0] mulAddResult = mulAddA * mulAddB + mulAddC;
+    // Select operands of 48bit adder
+    wire [sigWidth*2-1:0] muladd = int_mul ? {aux_part, {sigWidth{1'b0}}} : mulAddC;
+    wire [sigWidth*2:0] mulAddResult = mulA * mulB + muladd;
     mulAddRecFNToRaw_postMul#(expWidth, sigWidth)
         mulAddToRaw_postMul(
             intermed_compactState,
@@ -428,7 +435,7 @@ module
             out_sExp,
             out_sig
         );
-    assign int_mul_res = mulAddResult;
+    assign int_mul_res = mulAddResult[expWidth + sigWidth-1:0];
 endmodule
 
 /*----------------------------------------------------------------------------
