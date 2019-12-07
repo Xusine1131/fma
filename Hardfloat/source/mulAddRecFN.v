@@ -370,7 +370,7 @@ module
         input [1:0] op,
         // by set int_mul to 1, we can reuse this module to execute RISC-V integer multiply instruction MUL.
         input int_mul,
-        // Note that for both signed and unsigned multiply, the results are the same, because we truncated the sign extension when only evaluating lower part. 
+        // Note that for both signed and unsigned multiply, the results are the same, because we truncate the sign extension when only evaluating lower part. 
         input [(expWidth + sigWidth):0] a,
         input [(expWidth + sigWidth):0] b,
         input [(expWidth + sigWidth):0] c,
