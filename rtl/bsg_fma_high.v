@@ -1,7 +1,7 @@
 // -------------------------------------------------------
 // -- bsg_fma_high.v
 // -------------------------------------------------------
-// Support for MULH
+// Use 24bit multiplier and 48bit adder to calculate 32bit multiply.
 // -------------------------------------------------------
 
 
@@ -25,7 +25,7 @@ module bsg_fma_high #(
 );
 
 // >>>>>>>>> STAGE1: 24bit MUL >>>>>>>>>>>>>>>>>>
-typedef enum {eIdle, eMod1, eMod2, eSig1, eSig2} state_e;
+typedef enum logic [2:0] {eIdle, eMod1, eMod2, eSig1, eSig2} state_e;
 
 state_e state_1_r;
 
@@ -41,11 +41,10 @@ always_ff @(posedge clk_i) begin
         eMod2: state_1_r <= eSig1;
         eSig1: state_1_r <= eSig2;
         eSig2: state_1_r <= eIdle;
-    endcase
-end
+        default: begin
 
-always_ff @(posedge clk_i) begin
-    $display("state_1_r:%s", state_1_r.name());
+        end
+    endcase
 end
 
 // latch for operand
@@ -79,7 +78,7 @@ always_comb unique case(state_1_r)
     end
     eMod1: begin
         mul_opA = opA_r[width_lp-1-:sig_p];
-        mul_opB = opB_r[exp_p-1:0];
+        mul_opB = opB_r[width_lp-1-:exp_p];
     end
     eMod2: begin
         mul_opA = opA_r[width_lp-1-:exp_p];
@@ -98,14 +97,14 @@ wire [2*exp_p-1:0] aux_mul_a_res = aux_mul_a_opA * aux_mul_a_opB;
 
 // aux multiplier B
 wire [exp_p-1:0] aux_mul_b_opA = opB_i[exp_p-1:0];
-wire [exp_p-1:0] aux_mul_b_opB = opB_i[width_lp-1-:exp_p];
+wire [exp_p-1:0] aux_mul_b_opB = opA_i[width_lp-1-:exp_p];
 wire [2*exp_p-1:0] aux_mul_b_res = aux_mul_b_opA * aux_mul_b_opB;
 
 
-// Information need to send to level 2
+// Information to send to level 2
 reg v_r;
 reg [2*sig_p-1:0] mul_r;
-reg [2*exp_p-1:0] aux_mul_r;
+reg [2*exp_p:0] aux_mul_r;
 
 always_ff @(posedge clk_i) begin
     if(reset_i) begin
@@ -121,6 +120,7 @@ always_ff @(posedge clk_i) begin
     end
 end
 
+
 // >>>>>>>>>>>>>>>>>> STATE2: 48Bit Add <<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 // The state machine of state_2_r
@@ -133,21 +133,23 @@ always_ff @(posedge clk_i) begin
         eIdle: if(state_1_r == eMod1) begin
             state_2_r <= eMod1;
         end
-        eMod1: state_1_r <= eMod2;
-        eMod2: state_1_r <= eSig1;
-        eSig1: state_1_r <= eSig2;
-        eSig2: state_1_r <= eIdle;
+        eMod1: state_2_r <= eMod2;
+        eMod2: state_2_r <= eSig1;
+        eSig1: state_2_r <= eSig2;
+        eSig2: state_2_r <= eIdle;
+        default: begin
+
+        end
     endcase
 end
 
 logic [2*sig_p-1:0] cpa_opA;
 logic [2*sig_p-1:0] cpa_opB;
 logic opcode;
-wire [2*sig_p-1:0] cpa_res = cpa_opA + ({2*sig_p{opcode}} ^ cpa_opB) + opcode;
+wire [2*sig_p:0] cpa_res = cpa_opA + ({2*sig_p{opcode}} ^ cpa_opB) + opcode;
 
 // update of cpa operand
-
-wire [2*sig_p-1:0] acc;
+wire [2*sig_p:0] acc;
 
 always_comb unique case(state_2_r)
     eIdle: begin
@@ -156,13 +158,13 @@ always_comb unique case(state_2_r)
         opcode = 1'b0;
     end
     eMod1: begin
-        cpa_opA = acc[2*sig_p-1:sig_p];
-        cpa_opB = {mul_r[2*sig_p-1-exp_p:0], exp_p'(0)};
+        cpa_opA = acc[2*sig_p:width_lp];
+        cpa_opB = mul_r;
         opcode = 1'b0;
     end
     eMod2: begin
         cpa_opA = acc;
-        cpa_opB = {mul_r[2*sig_p-1-exp_p:0], exp_p'(0)};
+        cpa_opB = mul_r;
         opcode = 1'b0;
     end
     eSig1: begin
@@ -175,10 +177,15 @@ always_comb unique case(state_2_r)
         cpa_opB = opB_r[width_lp-1:0] & {width_lp{opA_r[width_lp]}};
         opcode = opA_r[width_lp];
     end
+    default: begin
+        cpa_opA = '0;
+        cpa_opB = '0;
+        opcode = '0;
+    end
 endcase
 
 // accumulator
-reg [2*sig_p-1:0] acc_r;
+reg [2*sig_p:0] acc_r;
 assign acc = acc_r;
 
 // update accumulator
@@ -195,16 +202,20 @@ always_ff @(posedge clk_i) begin
     if(reset_i) begin
         v_2_r <= '0;
     end
-    else if(state_2_r == eIdle)begin
+    else if(state_2_r == eIdle) begin
         v_2_r <= v_r;
     end
 end
 
 always_ff @(posedge clk_i) begin
-    $display("state_2_r:%s", state_1_r.name());
+    //$display("=========================");
+    //$display("v_r:%b",v_r);
+    //$display("state_1_r:%s", state_1_r.name());
+    //$display("v_2_r:%b",v_2_r);
+    //$display("state_2_r:%s", state_1_r.name());
 end
 
 assign mul_o = acc_r[width_lp-1:0];
-assign v_o = v_2_r & state_2_r == eIdle;
+assign v_o = v_2_r && state_2_r == eIdle;
 
 endmodule
